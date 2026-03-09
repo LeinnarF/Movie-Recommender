@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALS Solver Experiment Dashboard</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --text: #122033;
+      --muted: #5a6c84;
+      --line: #dfe6ef;
+      --brand: #0b7fab;
+      --brand-dark: #085f80;
+      --ok: #0f8a57;
+      --warn: #b96b00;
+      --err: #b32d2e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% -20%, #d8eef7 0%, transparent 38%),
+        radial-gradient(circle at 85% -25%, #ffe8c6 0%, transparent 35%),
+        var(--bg);
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(120deg, #0f3d56, #0b7fab 60%, #6ab7d6);
+      color: #fff;
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(8, 40, 60, 0.2);
+      margin-bottom: 18px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 1.7rem;
+      line-height: 1.25;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.95;
+      line-height: 1.45;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 3px 10px rgba(10, 28, 40, 0.06);
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+
+    .muted { color: var(--muted); }
+
+    .commands {
+      display: grid;
+      gap: 10px;
+    }
+
+    .command-row {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #f9fbfe;
+    }
+
+    .command-label {
+      background: #edf4fb;
+      color: #173451;
+      font-weight: 600;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.92rem;
+    }
+
+    .command-content {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    code.block {
+      flex: 1;
+      display: block;
+      padding: 10px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.86rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #122033;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-left: 1px solid var(--line);
+      padding: 0 14px;
+      background: #fff;
+      color: var(--brand-dark);
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 84px;
+    }
+
+    .btn:hover { background: #f0f8fc; }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      border: 1px solid var(--line);
+      background: #f8fbff;
+      color: #25425f;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .input {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      min-width: 320px;
+      max-width: 100%;
+      background: #fff;
+    }
+
+    .load-btn {
+      appearance: none;
+      border: 0;
+      background: var(--brand);
+      color: #fff;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .load-btn:hover { background: #09688c; }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.err { color: var(--err); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      overflow: auto;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f2f7fd;
+      color: #193756;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .table-wrap {
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .small {
+      font-size: 0.82rem;
+    }
+
+    .terminal-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0d1a25;
+      color: #d9f0ff;
+      padding: 10px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.84rem;
+      min-height: 220px;
+      max-height: 340px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .term-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.9rem;
+    }
+
+    @media (min-width: 920px) {
+      .span-6 { grid-column: span 6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>ALS Solver Comparison Dashboard</h1>
+      <p>
+        One-page view for your mini-research workflow: run commands, expected schemas, and CSV result inspection
+        for Experiment 1.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="card span-6">
+        <h2>Run Commands</h2>
+        <p class="muted small">Run these in terminal, then return here to load and inspect CSV outputs.</p>
+        <div class="commands">
+          <div class="command-row">
+            <div class="command-label">Default Experiment 1 Run</div>
+            <div class="command-content">
+              <code class="block" id="cmd-default">.\.venv\Scripts\python.exe run_experiment1.py</code>
+              <button class="btn" data-copy-target="cmd-default">Copy</button>
+            </div>
+          </div>
+
+          <div class="command-row">
+            <div class="command-label">Quick Smoke Run</div>
+            <div class="command-content">
+              <code class="block" id="cmd-smoke">.\.venv\Scripts\python.exe run_experiment1.py --epochs 1 --solvers gauss_jacobi --output-dir outputs/experiment1_smoke</code>
+              <button class="btn" data-copy-target="cmd-smoke">Copy</button>
+            </div>
+          </div>
+
+          <div class="command-row">
+            <div class="command-label">Custom (example)</div>
+            <div class="command-content">
+              <code class="block" id="cmd-custom">.\.venv\Scripts\python.exe run_experiment1.py --epochs 30 --k 10 --lam 0.1 --output-dir outputs/experiment1</code>
+              <button class="btn" data-copy-target="cmd-custom">Copy</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card span-6">
+        <h2>Experiment 1 Solver Set</h2>
+        <span class="pill">gaussian_pivoting</span>
+        <span class="pill">matrix_inverse</span>
+        <span class="pill">lu</span>
+        <span class="pill">qr</span>
+        <span class="pill">gauss_jacobi</span>
+        <span class="pill">gauss_seidel</span>
+        <span class="pill">cholesky (optional)</span>
+
+        <h2 style="margin-top:14px;">Expected CSV Schemas</h2>
+        <p class="small"><strong>Per-solver CSV:</strong> epoch, train_rmse, test_rmse, loss, mean_residual, mean_inner_iterations, mean_condition_number, epoch_time_sec, cumulative_time_sec</p>
+        <p class="small"><strong>Summary CSV:</strong> solver, final_train_rmse, final_test_rmse, final_loss, final_mean_residual, final_mean_inner_iterations, final_mean_condition_number, total_time_sec, epochs, k, lambda</p>
+      </article>
+
+      <article class="card">
+        <h2>Results Viewer</h2>
+        <p class="muted small">
+          By default it loads <code>outputs/experiment1/summary_experiment1.csv</code>. If your browser blocks local file fetch on
+          <code>file://</code>, serve the folder with:
+          <code>python -m http.server 8000</code>
+          then open
+          <code>http://localhost:8000/dashboard.html</code>.
+        </p>
+
+        <div class="row">
+          <input id="summaryPath" class="input" value="outputs/experiment1/summary_experiment1.csv" />
+          <button class="load-btn" id="loadSummaryBtn">Load Summary</button>
+        </div>
+        <div id="summaryStatus" class="status">Summary not loaded yet.</div>
+        <div class="table-wrap">
+          <table id="summaryTable"></table>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:16px 0;" />
+
+        <div class="row">
+          <input id="solverPath" class="input" value="outputs/experiment1/gaussian_pivoting_experiment1.csv" />
+          <button class="load-btn" id="loadSolverBtn">Load Solver CSV</button>
+        </div>
+        <div id="solverStatus" class="status">Solver CSV not loaded yet.</div>
+        <div class="table-wrap">
+          <table id="solverTable"></table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Embedded Terminal</h2>
+        <p class="muted small">
+          This terminal requires the local backend server. Start it with:
+          <code>python web_terminal.py</code>
+          then open
+          <code>http://127.0.0.1:8000/dashboard.html</code>.
+        </p>
+
+        <div class="row">
+          <input id="termCommand" class="term-input" placeholder="Type command, e.g. .\\.venv\\Scripts\\python.exe run_experiment1.py --epochs 1" />
+          <button class="load-btn" id="termRunBtn">Run</button>
+          <button class="load-btn" id="termClearBtn" style="background:#526578;">Clear</button>
+        </div>
+        <div id="termStatus" class="status">Terminal idle.</div>
+        <div id="termOutput" class="terminal-box">PowerShell terminal ready (backend required).</div>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    function parseCSV(text) {
+      const lines = text.replace(/\r/g, "").trim().split("\n");
+      if (!lines.length) return { headers: [], rows: [] };
+
+      const split = (line) => {
+        const out = [];
+        let cur = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i += 1) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i += 1;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ',' && !inQuotes) {
+            out.push(cur);
+            cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+        out.push(cur);
+        return out;
+      };
+
+      const headers = split(lines[0]);
+      const rows = lines.slice(1).filter(Boolean).map((line) => split(line));
+      return { headers, rows };
+    }
+
+    function renderTable(el, headers, rows) {
+      if (!headers.length) {
+        el.innerHTML = "";
+        return;
+      }
+
+      const thead = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${rows.map((r) => `<tr>${headers.map((_, i) => `<td>${(r[i] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      el.innerHTML = thead + tbody;
+    }
+
+    async function loadCsvToTable(pathInputId, statusId, tableId, label) {
+      const path = document.getElementById(pathInputId).value.trim();
+      const status = document.getElementById(statusId);
+      const table = document.getElementById(tableId);
+
+      status.className = "status";
+      status.textContent = `Loading ${label}: ${path}`;
+
+      try {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const text = await res.text();
+        const { headers, rows } = parseCSV(text);
+        renderTable(table, headers, rows);
+        status.className = "status ok";
+        status.textContent = `Loaded ${label}: ${rows.length} row(s).`;
+      } catch (err) {
+        status.className = "status err";
+        status.textContent = `Could not load ${label}. ${err.message}. Try running a local server (python -m http.server 8000).`;
+      }
+    }
+
+    async function copyTextById(id) {
+      const txt = document.getElementById(id).textContent;
+      try {
+        await navigator.clipboard.writeText(txt);
+      } catch (_) {
+        const ta = document.createElement("textarea");
+        ta.value = txt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    }
+
+    document.getElementById("loadSummaryBtn").addEventListener("click", () => {
+      loadCsvToTable("summaryPath", "summaryStatus", "summaryTable", "summary CSV");
+    });
+
+    document.getElementById("loadSolverBtn").addEventListener("click", () => {
+      loadCsvToTable("solverPath", "solverStatus", "solverTable", "solver CSV");
+    });
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-copy-target");
+        await copyTextById(id);
+        const old = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => { btn.textContent = old; }, 900);
+      });
+    });
+
+    const termOutput = document.getElementById("termOutput");
+    const termStatus = document.getElementById("termStatus");
+    const termCommand = document.getElementById("termCommand");
+
+    function appendTerm(text) {
+      termOutput.textContent += `\n${text}`;
+      termOutput.scrollTop = termOutput.scrollHeight;
+    }
+
+    async function runTerminalCommand() {
+      const command = termCommand.value.trim();
+      if (!command) return;
+
+      termStatus.className = "status";
+      termStatus.textContent = "Running command...";
+      appendTerm(`PS> ${command}`);
+
+      try {
+        const res = await fetch("/api/terminal/exec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data.stdout) appendTerm(data.stdout.trimEnd());
+        if (data.stderr) appendTerm(data.stderr.trimEnd());
+
+        if (data.exit_code === 0) {
+          termStatus.className = "status ok";
+          termStatus.textContent = `Done (exit 0). CWD: ${data.cwd}`;
+        } else {
+          termStatus.className = "status warn";
+          termStatus.textContent = `Finished with exit ${data.exit_code}. CWD: ${data.cwd}`;
+        }
+      } catch (err) {
+        termStatus.className = "status err";
+        termStatus.textContent = `Terminal backend unavailable: ${err.message}. Start with 'python web_terminal.py'.`;
+      }
+    }
+
+    document.getElementById("termRunBtn").addEventListener("click", runTerminalCommand);
+    termCommand.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        runTerminalCommand();
+      }
+    });
+    document.getElementById("termClearBtn").addEventListener("click", () => {
+      termOutput.textContent = "PowerShell terminal ready (backend required).";
+      termStatus.className = "status";
+      termStatus.textContent = "Terminal cleared.";
+    });
+  </script>
+</body>
+</html>
