@@ -121,3 +121,21 @@ Expected columns:
 - Experiment runner: `run_experiment1.py`
 - ALS engine and logging: `als_engine.py`
 - Solver modules: `solvers/`
+
+## HTML Dashboard With Embedded Terminal
+
+To use the embedded terminal inside `dashboard.html`, run the local backend server:
+
+```bash
+python web_terminal.py
+```
+
+Then open:
+
+- `http://127.0.0.1:8000/dashboard.html`
+
+Notes:
+
+- The browser cannot execute shell commands directly without a backend.
+- The terminal panel uses `/api/terminal/exec` from `web_terminal.py`.
+- Current working directory is preserved across commands, including `cd`.
