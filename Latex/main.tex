@@ -6,12 +6,26 @@
 \usepackage{setspace}
 \usepackage{enumitem}
 \usepackage{booktabs,longtable,threeparttable,siunitx,tabularx,makecell}
+\usepackage{xcolor, listings}
 
-% \usepackage{TimeNewRoman}
-% \usepackage{newtxtext,newtxmath}
-% \renewcommand{\rmdefault}{ptm}
-% \renewcommand{\sfdefault}{phv}
-% \renewcommand{\ttdefault}{pcr}
+% Python listings settings
+\lstset{,
+	basicstyle      = \ttfamily\small,
+	language        = Python,            
+	breaklines       = true,
+	keywordstyle     = \color{blue},
+	commentstyle     = \color{green!60!black},
+	identifierstyle  = \color{black},
+	stringstyle      = \color{orange},
+	showstringspaces = false,
+	stepnumber       = 1,
+	numbersep        = 5pt,
+	frame            = single,
+	tabsize          = 4,
+	captionpos       = b,
+	morekeywords     = {import, def, return, for, in, if, else, np, linalg, time}
+}
+
 
 \graphicspath{{figures/}}
 
@@ -43,7 +57,7 @@ Franniel Luigi Hilario
 \begin{document}
 \emergencystretch 3em
 \sloppy
-\doublespacing
+\onehalfspacing
 
 \begin{titlepage}
 \pagenumbering{gobble}
@@ -51,7 +65,7 @@ Franniel Luigi Hilario
 
 \begin{minipage}[c][3\baselineskip][c]{0.9\linewidth}
 \centering\bfseries\large\MakeUppercase{
-On the Perforamance of Linear System Solvers in Alternating Least Squares for Collaborative Filtering
+On the Performance of Linear System Solvers in Alternating Least Squares for Collaborative Filtering
 }
 \end{minipage}
 
@@ -69,8 +83,11 @@ Bulacan State University, Malolos, Bulacan
 \vspace{1in}
 \begin{abstract}
 \begin{justify}
+This study examines how the choice of linear system solver affects the practical behavior of Alternating Least Squares (ALS) for collaborative filtering. Using the MovieLens 100K dataset, we evaluate five solver strategies inside the ALS update step: explicit matrix inversion, Gaussian elimination with partial pivoting, LU decomposition, QR decomposition, and Cholesky decomposition. The investigation combines exploratory data analysis, model training, and solver-level diagnostics under a fixed experimental setup (latent factors $K=10$, regularization $\lambda=10$, and 30 epochs).
 
-Todo
+The exploratory analysis confirms that the rating distribution is generally concentrated toward higher scores and that user-item interactions are sparse but structurally consistent for matrix factorization. A filtered version of the dataset is also considered by removing extreme user and item average-rating profiles; this preserves central tendency while slightly reducing variability.
+
+For solver comparison, three objectives are considered: computational efficiency, numerical stability, and recommendation quality. Results show that train and test RMSE trajectories are effectively identical across correctly implemented solvers, indicating that solver choice does not materially change recommendation quality on this benchmark. The primary practical difference is runtime. Numerical behavior is interpreted through residual norms $\|Ax-b\|$ for solver precision, while condition number is treated as a property of the ALS subproblem matrix rather than a solver-specific metric. Overall, the findings support selecting solvers primarily by efficiency for well-conditioned ALS subproblems, while favoring numerically robust factorizations in more ill-conditioned settings.
 
 \end{justify}
 \end{abstract}
@@ -259,7 +276,7 @@ Each triangular solve costs \( \mathcal{O}(n^2) \), and the factorization itself
 
 \subsection{Gaussian Elimination with Partial Pivoting}
 
-Gaussian elimination is a systematic method for solving a linear system \( Ax = b \) by reducing the augmented matrix \( [A \mid b] \) to upper triangular form through a sequence of row operations, after which the solution is recovered by back substitution. While straightforward in theory, a naive implementation can fail or produce highly inaccurate results when a pivot element, the leading entry used to eliminate entries below it, is zero or very small, causing division by a near-zero number and amplifying numerical errors. \textbf{Partial pivoting} addresses this by introducing a row-swapping strategy: before each elimination step, the algorithm scans the current column for the entry with the largest absolute value and swaps that row to the pivot position. This ensures that the largest available value is always used as the pivot, keeping the multipliers used during elimination bounded and preventing error amplification \parencite{anton2014elementary}.
+Gaussian elimination is a systematic method for solving a linear system \( Ax = b \) by reducing the augmented matrix \( [A \mid b] \) to upper triangular form through a sequence of row operations, after which the solution is recovered by back substitution. While straightforward in theory, a naive implementation can fail or produce highly inaccurate results when a pivot element, the leading entry used to eliminate entries below it, is zero or very small, causing division by a near-zero number and amplifying numerical errors. Partial pivoting addresses this by introducing a row-swapping strategy: before each elimination step, the algorithm scans the current column for the entry with the largest absolute value and swaps that row to the pivot position. This ensures that the largest available value is always used as the pivot, keeping the multipliers used during elimination bounded and preventing error amplification \parencite{anton2014elementary}.
 
 \begin{definition}[Gaussian Elimination with Partial Pivoting]
     At the \( k \)-th elimination step, partial pivoting selects the row 
@@ -330,15 +347,166 @@ which is computed by first forming \( c = Q^\top b \) and then solving the trian
 
 \vspace{4em}
 
-\chapter*{Methods and Applications}
+\chapter*{Methods}
+
+In this section, we describe the dataset used for benchmarking the ALS solvers, the preprocessing steps taken to prepare the data, the experimental setup for comparing solver performance, and the evaluation criteria used to interpret results. We also discuss the practical application context of collaborative filtering for movie recommendation.
+
+\section{Dataset and Preprocessing}
+For this study, the dataset from MovieLens 100k was used. It contains 100,000 reviews from 943 users on 1682 movies. The ratings are on a scale of 1 to 5, with 5 being the highest rating. The dataset is widely used in recommender system research and provides a manageable size for testing different ALS solvers without requiring extensive computational resources \parencite{harper2015movielens}.
+
+In order for the Alternating least squares algorithm to work effectively, the user and item (movies) data were processed to be a matrix. The entries of the matrix are the ratings given by the user for the specific movie. The resulting matrix \( R \) was sparse, meaning most of the entries are zeros. 93.7\% of the matrix were missing, and the goal is the prediction of these missing entries based on the observed ratings.
+
+\subsection{Exploratory Data Analysis}
+
+Before benchmarking the solvers, an exploratory data analysis (EDA) was conducted to understand the structure and characteristics of the dataset. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Distribution of ratings}
+	\label{fig:rating-dist}
+	\includegraphics[width=0.5\textwidth]{rating.png}
+\end{figure}
+
+Figure \ref{fig:rating-dist} shows the distribution is skewed to the higher ratings. The median is 4, and the mean is 3.53, indicating that users tend to give higher ratings more frequently than lower ones. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Average ratings per users}
+	\label{fig:avg-rating-user}
+	\includegraphics[width=0.7\textwidth]{dist-avg.png}
+\end{figure}
+
+Figure \ref{fig:avg-rating-user} shows the distribution of average ratings per user. This shows more granuality compared to Figure \ref{fig:rating-dist} and shows that some users have a tendency to give higher ratings than others.
+
+\begin{figure}[H]
+	\centering
+	\caption{Distribution of User ratings}
+	\label{fig:dist-rating}
+	\includegraphics[width=0.7\textwidth]{dist-rating.png}
+\end{figure}
+
+\section{Experimental Setup for ALS Solver Comparison}
+
+A train-test split was done on the observed ratings, with 80\% of the data used for training and 20\% reserved for testing. The ALS algorithm was implemented with a fixed set of hyperparameters across all solver runs to ensure a fair comparison. The following hyperparameters were used:
+\begin{itemize}
+		\item Latent dimension \( K = 10 \),
+		\item Regularization parameter \( \lambda = 10.0 \),
+		\item Training epochs (iterations): 30.
+\end{itemize}
+
+These values were chosen to provide a reasonable balance between model complexity and computational feasibility for the benchmark dataset. The same random seed was used for all runs to ensure that the initial latent factor matrices \( U \) and \( V \) were identical across solvers, isolating the effect of the solver choice on performance.
+
+\subsection{System of Linear Equation Solver Implementation}
+To ensure a fair comparison, all solvers were implemented in Python and no high-level library functions that abstract away the underlying algorithm were used. This allows for a direct comparison of the computational efficiency and numerical stability of each method in the context of the ALS update step. The solver includes matrix inverse method, Gaussian elimination with Partial pivoting, LU decomposition, QR decomposition, and Cholesky decomposition.
+
+\noindent Each run logs per-epoch quantities for analysis and comparison:
+\begin{itemize}
+    \item training RMSE,
+    \item test RMSE,
+    \item elapsed time,
+    \item average residual norm $\|Ax-b\|$,
+    \item condition number of ALS subproblem matrices.
+\end{itemize}
+
+With these metrics, the evaluation not only includes final recommendation quality but also the convergence behavior, computational efficiency, and numerical stability of each solver choice within the ALS framework.
 
 \vspace{4em}
 
 \chapter*{Analysis and Results}
 
+The results of the ALS solver comparison are presented in this section, focusing on the three main evaluation criteria: computational efficiency, numerical stability, and recommendation quality. The analysis includes a discussion of the observed trends and their implications for selecting solvers in practical recommender system implementations.
+
+\section{Alternating Least Squares Convergence}
+
+All solvers showed similar convergence patterns in terms of training and test RMSE over the 30 epochs. The final RMSE values on the test set were effectively identical across solvers, indicating that the choice of linear system solver did not materially affect the quality of the recommendations generated by ALS on this dataset. This suggests that, for well-implemented solvers, the numerical solution to the ALS subproblems is sufficiently accurate to yield comparable model performance.
+
+\begin{table}[h]
+	\centering
+	\caption{ALS training metrics across epochs}
+	\label{tab:training}
+	\begin{tabularx}{\linewidth}{XXXXX}
+		\toprule
+		\textbf{Epoch} & \textbf{Train RMSE} & \textbf{Test RMSE} & \textbf{Loss} & \textbf{$\kappa$(A)} \\
+		\midrule
+		5 & 0.8533 & 1.0046 & 138{,}674.65 & 18.87 \\
+		10 & 0.8166 & 0.9767 & 129{,}916.52 & 15.51 \\
+		15 & 0.8096 & 0.9716 & 128{,}839.00 & 15.14 \\
+		20 & 0.8073 & 0.9700 & 128{,}623.42 & 15.09 \\
+		25 & 0.8065 & 0.9694 & 128{,}569.10 & 15.10 \\
+		30 & 0.8061 & 0.9691 & 128{,}549.98 & 15.10 \\
+		\bottomrule
+	\end{tabularx}
+\end{table}
+
+Table \ref{tab:training} shows the training and test RMSE values across epochs, along with the loss and condition number of the ALS subproblem matrices. The RMSE values decrease steadily, indicating that the model is learning effectively, while the condition number remains relatively stable, suggesting that the numerical properties of the subproblems do not degrade significantly over iterations. 
+
+\begin{figure}[H]
+	\centering
+	\caption{RMSE Progression over Epochs}
+	\label{fig:rmse-epochs}
+	\includegraphics[width=\linewidth]{progression.png}
+\end{figure}
+
+Figure \ref{fig:rmse-epochs} visually confirms the convergence behavior, showing that all solvers follow the same trajectory in terms of RMSE reduction, reinforcing the conclusion that solver choice does not impact recommendation quality on this dataset. Further, the progression of both training and test RMSE suggests that the model is not overfitting, as the gap between them remains small and stable across epochs.
+
+\subsection{Runtime and Stability}
+
+Even though recommendation quality was similar across solvers, their runtime and stability differed.
+
+\subsubsection{Runtime Comparison}
+
+\begin{figure}[H]
+	\centering
+	\caption{Solver Runtime}
+	\label{fig:runtime}
+	\includegraphics[width=\linewidth]{runtime.png}
+\end{figure}
+
+Figure \ref{fig:runtime} shows the runtime for each solver. Cholesky decomposition was the fastest this because it exploits the symmetric positive definite (SPD) structure of the ALS subproblems, while explicit matrix inversion was the slowest due to its computational inefficiency and numerical instability.
+LU decomposition, QR decomposition, and Partial pivoting shows almost similar runtime and 3 times faster the matrix inverse method.
+
+\subsubsection{Solver Stability}
+
+\begin{figure}[H]
+	\centering
+	\caption{RMSE Progression over Epochs}
+	\label{fig:resid}
+	\includegraphics[width=\linewidth]{residual.png}
+\end{figure}
+
+Figure \ref{fig:resid} shows the average residual norm $\|Ax-b\|$ for each solver across epochs. The residual norms were lowest for Cholesky decomposition, this is again due to the SPD structure of the ALS subproblems, which allows it to achieve more accurate solutions. The residual progression also shown consistent for each epoch, indicating that the numerical stability of the solvers did not degrade over time.
+Explicit matrix inversion had the highest residual norms, reflecting its lower numerical stability. The other solvers had intermediate residual norms, with LU and  partial pivoting achieve a similar level of stability, this is due to the fact the both solvers are based on Gaussian elimination. QR decomposition had slightly higher residual norms than Cholesky, which is expected since it does not exploit the SPD structure as effectively.
+
+\begin{table}[h]
+\centering
+\caption{Solver Comparison Summary}
+\label{tab:solver-comparison}
+\begin{tabularx}{\linewidth}{XXXXX}
+\toprule
+\textbf{Solver} & \textbf{Train RMSE} & \textbf{Test RMSE} & \textbf{Elapsed Time (s)} & \textbf{Avg Residual $\|Ax-b\|$}\\
+\midrule
+Cholesky Decomposition & 0.806108 & 0.969133 & 18.1859 & $5.15 \times 10^{-14}$  \\
+LU Decomposition       & 0.806108 & 0.969133 & 28.5464 & $5.85 \times 10^{-14}$  \\
+QR Decomposition       & 0.806108 & 0.969133 & 27.2921 & $9.55 \times 10^{-14}$  \\
+Matrix Inverse         & 0.806108 & 0.969133 & 86.7331 & $3.64 \times 10^{-13}$  \\
+Partial Pivoting       & 0.806108 & 0.969133 & 25.7574 & $5.85 \times 10^{-14}$  \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Table \ref{tab:solver-comparison} summarizes the key metrics for each solver, confirming that while all solvers achieved the same RMSE values, their runtime and numerical stability varied significantly. Cholesky decomposition stands out as the best choice for this problem due to its combination of speed and stability, while explicit matrix inversion is clearly the least favorable option.
+
+
 \vspace{4em}
 
 \chapter*{Conclusion}
+This work evaluated five linear system solvers within ALS for collaborative filtering and showed that, on MovieLens 100K with fixed hyperparameters, recommendation quality is essentially invariant to solver choice. The principal differentiator is computational efficiency, while numerical stability differences are better captured by residual norms than by condition number alone.
+
+The study also established a data-informed context through exploratory analysis, confirming that the rating matrix structure is compatible with ALS modeling and that mild filtering can reduce outlier influence without changing central behavior. Integrating EDA with solver benchmarking provides a clearer basis for engineering decisions than model-metric comparison alone.
+
+For well-conditioned ALS subproblems, practitioners should prioritize fast and stable factorization-based solvers, particularly Cholesky when symmetric positive definite structure is present. For more difficult or ill-conditioned regimes, numerical robustness should be weighted more heavily than raw speed, with residual diagnostics monitored throughout training.
+
+Future work may extend this comparison to larger datasets, different latent dimensions and regularization strengths, and iterative solvers to study scalability and trade-offs in distributed or production-scale recommender systems.
 \newpage
 \printbibliography[heading=bibintoc,title={REFERENCES}]
 \end{document}
