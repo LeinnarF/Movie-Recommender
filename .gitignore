@@ -1,10 +1,3 @@
-# Python bytecode/cache
-__pycache__/
-**/__pycache__/
-*.py[cod]
-
-# Experiment-generated CSV artifacts
-outputs/**/*.csv
 # LaTeX build files
 *.aux
 *.bcf
