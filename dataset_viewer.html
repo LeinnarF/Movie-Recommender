@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MovieLens Read-Only Dataset Viewer</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --text: #102132;
+      --muted: #5e6f86;
+      --line: #d9e3ef;
+      --brand: #0a7a9f;
+      --brand-dark: #075f7c;
+      --ok: #0f8a57;
+      --warn: #b96b00;
+      --err: #b32d2e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% -20%, #d8edf7 0%, transparent 35%),
+        radial-gradient(circle at 86% -18%, #ffe8c8 0%, transparent 32%),
+        var(--bg);
+    }
+
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .hero {
+      background: linear-gradient(120deg, #0f3d56, #0b7fab 58%, #70bad6);
+      color: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 10px 24px rgba(10, 40, 60, 0.2);
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+    }
+
+    .hero p {
+      margin: 0;
+      line-height: 1.4;
+      opacity: 0.96;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 3px 10px rgba(10, 28, 40, 0.06);
+      margin-bottom: 14px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(12, 1fr);
+      align-items: end;
+    }
+
+    .field {
+      grid-column: span 12;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 0.83rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .input, .select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .btn:hover { background: var(--brand-dark); }
+
+    .btn.secondary {
+      background: #516476;
+    }
+
+    .btn.secondary:hover {
+      background: #425262;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.err { color: var(--err); }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      max-height: 560px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      background: #fff;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #edf5fd;
+      color: #163651;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .meta {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: #1f3e5a;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: #f8fbff;
+      border-radius: 999px;
+      padding: 3px 10px;
+    }
+
+    @media (min-width: 860px) {
+      .col-5 { grid-column: span 5; }
+      .col-4 { grid-column: span 4; }
+      .col-3 { grid-column: span 3; }
+      .col-2 { grid-column: span 2; }
+      .col-1 { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>MovieLens Dataset Viewer (Read-Only)</h1>
+      <p>
+        Browse all major <code>ml-100k</code> files with search and paging. This page only reads files and has no edit/write actions.
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="controls">
+        <div class="field col-3">
+          <label for="filePreset">Dataset file</label>
+          <select id="filePreset" class="select"></select>
+        </div>
+
+        <div class="field col-5">
+          <label for="dataPath">File path</label>
+          <input id="dataPath" class="input" value="dataset/ml-100k/u.data" />
+        </div>
+
+        <div class="field col-4">
+          <label for="itemsPath">Movie metadata path (for rating files)</label>
+          <input id="itemsPath" class="input" value="dataset/ml-100k/u.item" />
+        </div>
+
+        <div class="field col-4">
+          <label for="searchBox">Search current file</label>
+          <input id="searchBox" class="input" placeholder="Type to filter rows" />
+        </div>
+
+        <div class="field col-2">
+          <label for="ratingFilter">Rating filter</label>
+          <select id="ratingFilter" class="select">
+            <option value="all">All</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+
+        <div class="field col-2">
+          <label for="rowsPerPage">Rows per page</label>
+          <select id="rowsPerPage" class="select">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+
+        <div class="field col-2">
+          <label>&nbsp;</label>
+          <button id="loadBtn" class="btn">Load File</button>
+        </div>
+
+        <div class="field col-1">
+          <label>&nbsp;</label>
+          <button id="prevBtn" class="btn secondary">Prev</button>
+        </div>
+
+        <div class="field col-1">
+          <label>&nbsp;</label>
+          <button id="nextBtn" class="btn secondary">Next</button>
+        </div>
+      </div>
+
+      <div id="status" class="status">Dataset not loaded yet.</div>
+      <div class="meta">
+        <span class="pill" id="metaFile">File: -</span>
+        <span class="pill" id="metaTotal">Total rows: 0</span>
+        <span class="pill" id="metaFiltered">Filtered rows: 0</span>
+        <span class="pill" id="metaPage">Page: 0 / 0</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table id="dataTable"></table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const FILE_PRESETS = [
+      { label: "u.data", path: "dataset/ml-100k/u.data", kind: "ratings" },
+      { label: "u.genre", path: "dataset/ml-100k/u.genre", kind: "genre" },
+      { label: "u.info", path: "dataset/ml-100k/u.info", kind: "info" },
+      { label: "u.item", path: "dataset/ml-100k/u.item", kind: "items" },
+      { label: "u.occupation", path: "dataset/ml-100k/u.occupation", kind: "occupation" },
+      { label: "u.user", path: "dataset/ml-100k/u.user", kind: "users" },
+      { label: "u1.base", path: "dataset/ml-100k/u1.base", kind: "ratings" },
+      { label: "u1.test", path: "dataset/ml-100k/u1.test", kind: "ratings" },
+      { label: "u2.base", path: "dataset/ml-100k/u2.base", kind: "ratings" },
+      { label: "u2.test", path: "dataset/ml-100k/u2.test", kind: "ratings" },
+      { label: "u3.base", path: "dataset/ml-100k/u3.base", kind: "ratings" },
+      { label: "u3.test", path: "dataset/ml-100k/u3.test", kind: "ratings" },
+      { label: "u4.base", path: "dataset/ml-100k/u4.base", kind: "ratings" },
+      { label: "u4.test", path: "dataset/ml-100k/u4.test", kind: "ratings" },
+      { label: "u5.base", path: "dataset/ml-100k/u5.base", kind: "ratings" },
+      { label: "u5.test", path: "dataset/ml-100k/u5.test", kind: "ratings" },
+      { label: "ua.base", path: "dataset/ml-100k/ua.base", kind: "ratings" },
+      { label: "ua.test", path: "dataset/ml-100k/ua.test", kind: "ratings" },
+      { label: "ub.base", path: "dataset/ml-100k/ub.base", kind: "ratings" },
+      { label: "ub.test", path: "dataset/ml-100k/ub.test", kind: "ratings" }
+    ];
+
+    const ITEM_HEADERS = [
+      "item_id",
+      "movie_title",
+      "release_date",
+      "video_release_date",
+      "imdb_url",
+      "unknown",
+      "action",
+      "adventure",
+      "animation",
+      "childrens",
+      "comedy",
+      "crime",
+      "documentary",
+      "drama",
+      "fantasy",
+      "film_noir",
+      "horror",
+      "musical",
+      "mystery",
+      "romance",
+      "sci_fi",
+      "thriller",
+      "war",
+      "western"
+    ];
+
+    const state = {
+      rows: [],
+      filtered: [],
+      headers: [],
+      kind: "ratings",
+      page: 1,
+    };
+
+    const els = {
+      filePreset: document.getElementById("filePreset"),
+      dataPath: document.getElementById("dataPath"),
+      itemsPath: document.getElementById("itemsPath"),
+      searchBox: document.getElementById("searchBox"),
+      ratingFilter: document.getElementById("ratingFilter"),
+      rowsPerPage: document.getElementById("rowsPerPage"),
+      loadBtn: document.getElementById("loadBtn"),
+      prevBtn: document.getElementById("prevBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      status: document.getElementById("status"),
+      metaFile: document.getElementById("metaFile"),
+      metaTotal: document.getElementById("metaTotal"),
+      metaFiltered: document.getElementById("metaFiltered"),
+      metaPage: document.getElementById("metaPage"),
+      table: document.getElementById("dataTable"),
+    };
+
+    function setStatus(text, type) {
+      els.status.className = "status" + (type ? ` ${type}` : "");
+      els.status.textContent = text;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function parseDelimitedRows(text, delimiter, headers) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+      const rows = [];
+      for (const line of lines) {
+        const parts = line.split(delimiter);
+        const row = {};
+        headers.forEach((header, index) => {
+          row[header] = parts[index] !== undefined ? parts[index] : "";
+        });
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function parseItemTitles(text) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+      const byId = new Map();
+      for (const line of lines) {
+        const parts = line.split("|");
+        if (parts.length >= 2) {
+          const id = Number(parts[0]);
+          if (Number.isFinite(id)) {
+            byId.set(id, parts[1]);
+          }
+        }
+      }
+      return byId;
+    }
+
+    function parseRatingRows(text, titleById) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+      const rows = [];
+      for (const line of lines) {
+        const parts = line.split("\t");
+        if (parts.length < 4) continue;
+
+        const itemId = Number(parts[1]);
+        rows.push({
+          user_id: parts[0],
+          item_id: parts[1],
+          movie_title: titleById.get(itemId) || "(title not found)",
+          rating: parts[2],
+          timestamp: parts[3],
+        });
+      }
+      return rows;
+    }
+
+    function parseInfoRows(text) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+      return lines.map((line) => {
+        const match = line.match(/^(\d+)\s+(.+)$/);
+        if (match) {
+          return { value: match[1], metric: match[2] };
+        }
+        return { value: "", metric: line };
+      });
+    }
+
+    function parseSingleColumnRows(text, columnName) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(Boolean);
+      return lines.map((line) => ({ [columnName]: line }));
+    }
+
+    function inferKindFromPath(path) {
+      const normalized = path.replace(/\\/g, "/").toLowerCase();
+      const preset = FILE_PRESETS.find((entry) => entry.path.toLowerCase() === normalized);
+      if (preset) return preset.kind;
+      return "text";
+    }
+
+    function updateRatingFilterAvailability() {
+      const isRatings = state.kind === "ratings";
+      els.ratingFilter.disabled = !isRatings;
+      if (!isRatings) {
+        els.ratingFilter.value = "all";
+      }
+    }
+
+    function applyFilters() {
+      const query = els.searchBox.value.trim().toLowerCase();
+      const ratingFilter = els.ratingFilter.value;
+
+      state.filtered = state.rows.filter((row) => {
+        if (state.kind === "ratings" && ratingFilter !== "all" && String(row.rating) !== ratingFilter) {
+          return false;
+        }
+
+        if (!query) return true;
+
+        const haystack = Object.values(row).join(" ").toLowerCase();
+        return haystack.includes(query);
+      });
+
+      state.page = 1;
+      renderTable();
+    }
+
+    function renderTable() {
+      const perPage = Number(els.rowsPerPage.value) || 50;
+      const total = state.filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      state.page = Math.min(Math.max(1, state.page), totalPages);
+
+      const start = (state.page - 1) * perPage;
+      const pageRows = state.filtered.slice(start, start + perPage);
+
+      if (!state.headers.length) {
+        els.table.innerHTML = "";
+      } else {
+        const thead = `<thead><tr>${state.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>`;
+        const tbody = `<tbody>${pageRows.map((row) => (
+          `<tr>${state.headers.map((h) => `<td>${escapeHtml(row[h])}</td>`).join("")}</tr>`
+        )).join("")}</tbody>`;
+        els.table.innerHTML = thead + tbody;
+      }
+
+      els.metaTotal.textContent = `Total rows: ${state.rows.length}`;
+      els.metaFiltered.textContent = `Filtered rows: ${state.filtered.length}`;
+      els.metaPage.textContent = `Page: ${state.page} / ${totalPages}`;
+      els.prevBtn.disabled = state.page <= 1;
+      els.nextBtn.disabled = state.page >= totalPages;
+    }
+
+    function setDataset(rows, headers, kind) {
+      state.rows = rows;
+      state.filtered = rows.slice();
+      state.headers = headers;
+      state.kind = kind;
+      state.page = 1;
+      updateRatingFilterAvailability();
+      renderTable();
+    }
+
+    async function loadDataset() {
+      const dataPath = els.dataPath.value.trim();
+      const itemsPath = els.itemsPath.value.trim();
+
+      if (!dataPath) {
+        setStatus("File path is required.", "err");
+        return;
+      }
+
+      setStatus("Loading file...", "");
+
+      try {
+        const kind = inferKindFromPath(dataPath);
+        const dataRes = await fetch(dataPath, { cache: "no-store" });
+        if (!dataRes.ok) {
+          throw new Error(`Failed to load file (HTTP ${dataRes.status})`);
+        }
+        const text = await dataRes.text();
+
+        if (kind === "ratings") {
+          let titleById = new Map();
+          if (itemsPath) {
+            const itemRes = await fetch(itemsPath, { cache: "no-store" });
+            if (itemRes.ok) {
+              titleById = parseItemTitles(await itemRes.text());
+            }
+          }
+          const rows = parseRatingRows(text, titleById);
+          setDataset(rows, ["user_id", "item_id", "movie_title", "rating", "timestamp"], kind);
+        } else if (kind === "items") {
+          const rows = parseDelimitedRows(text, "|", ITEM_HEADERS);
+          setDataset(rows, ITEM_HEADERS, kind);
+        } else if (kind === "users") {
+          const headers = ["user_id", "age", "gender", "occupation", "zip_code"];
+          const rows = parseDelimitedRows(text, "|", headers);
+          setDataset(rows, headers, kind);
+        } else if (kind === "genre") {
+          const headers = ["genre", "genre_id"];
+          const rows = parseDelimitedRows(text, "|", headers);
+          setDataset(rows, headers, kind);
+        } else if (kind === "occupation") {
+          const headers = ["occupation"];
+          const rows = parseSingleColumnRows(text, "occupation");
+          setDataset(rows, headers, kind);
+        } else if (kind === "info") {
+          const headers = ["value", "metric"];
+          const rows = parseInfoRows(text);
+          setDataset(rows, headers, kind);
+        } else {
+          const headers = ["line"];
+          const rows = parseSingleColumnRows(text, "line");
+          setDataset(rows, headers, kind);
+        }
+
+        els.metaFile.textContent = `File: ${dataPath}`;
+        setStatus(`Loaded ${state.rows.length} row(s) in read-only mode.`, "ok");
+        applyFilters();
+      } catch (err) {
+        setStatus(
+          `${err.message}. If needed, run a local server and open from http://localhost:8000.`,
+          "err"
+        );
+      }
+    }
+
+    function populatePresets() {
+      const optionsHtml = FILE_PRESETS.map((preset) => (
+        `<option value="${escapeHtml(preset.path)}">${escapeHtml(preset.label)}</option>`
+      )).join("");
+      els.filePreset.innerHTML = optionsHtml;
+    }
+
+    function syncPathToPreset() {
+      const path = els.filePreset.value;
+      els.dataPath.value = path;
+    }
+
+    els.loadBtn.addEventListener("click", loadDataset);
+    els.searchBox.addEventListener("input", applyFilters);
+    els.ratingFilter.addEventListener("change", applyFilters);
+    els.rowsPerPage.addEventListener("change", () => {
+      state.page = 1;
+      renderTable();
+    });
+
+    els.filePreset.addEventListener("change", () => {
+      syncPathToPreset();
+      loadDataset();
+    });
+
+    els.prevBtn.addEventListener("click", () => {
+      state.page -= 1;
+      renderTable();
+    });
+
+    els.nextBtn.addEventListener("click", () => {
+      state.page += 1;
+      renderTable();
+    });
+
+    populatePresets();
+    syncPathToPreset();
+    loadDataset();
+  </script>
+</body>
+</html>
