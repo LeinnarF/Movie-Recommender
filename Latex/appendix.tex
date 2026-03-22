@@ -1,13 +1,223 @@
 \clearpage
 \appendix
-\thispagestyle{empty}
+\thispagestyle{plain}
 \vspace*{\fill}
 \begin{center}
-    {\Huge Appendix}
+		\Huge\textbf{Appendix}
 \end{center}
 \vspace*{\fill}
 \clearpage
 
 \newpage
 
-\section{Code Snippets}
+% \newgeometry{margin=0.75in}
+\lstset{
+    frame=none,
+    aboveskip=2pt,
+    belowskip=2pt,
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true
+}
+
+\chapter*{Appendix: Code Snippets}
+\addcontentsline{toc}{chapter}{Appendix: Code Snippets}
+
+\subsection{Alternating Least Squares Engine (als.py)}
+\begin{lstlisting}[language=Python, caption={ALS Engine Implementation}]
+import numpy as np
+import time
+from dataclasses import dataclass, field
+from typing import List, Callable
+
+# Convergence Tracker
+@dataclass
+class ALSLog:
+  solver_name   : str
+  train_rmse    : List[float] = field(default_factory=list)
+  test_rmse     : List[float] = field(default_factory=list)
+  train_loss    : List[float] = field(default_factory=list)
+  residual_norm : List[float] = field(default_factory=list)
+  cond_number   : List[float] = field(default_factory=list)
+  elapsed_time  : List[float] = field(default_factory=list)
+
+  def rmse_delta(self):
+    tr = self.train_rmse
+    return [abs(tr[i] - tr[i-1]) for i in range(1, len(tr))]
+
+  def epoch_to_convergence(self, eps=1e-4):
+    for i, d in enumerate(self.rmse_delta()):
+      if d < eps: return i + 2
+    return None
+
+# Metric Helpers
+def _rmse(R_true, U, V):
+  mask = R_true > 0
+  pred = (U @ V.T)[mask]
+  return float(np.sqrt(np.mean((pred - R_true[mask]) ** 2)))
+
+def _reg_loss(R, U, V, lam):
+  mask = R > 0
+  pred = (U @ V.T)[mask]
+  return float(np.sum((pred - R[mask]) ** 2) 
+               + lam * (np.sum(U ** 2) + np.sum(V ** 2)))
+
+def _safe_cond(A):
+  try:
+    return float(np.linalg.cond(A))
+  except np.linalg.LinAlgError:
+    return float('inf')
+
+# ALS Engine
+def run_als(R_train, R_test, solver_fn, solver_name, k=10, lam=0.1, n_epochs=50, seed=42, verbose=True):
+  log = ALSLog(solver_name=solver_name)
+  np.random.seed(seed)
+  n_users, n_items = R_train.shape
+  lam_I = lam * np.eye(k)
+  U = np.random.normal(0, 0.1, (n_users, k))
+  V = np.random.normal(0, 0.1, (n_items, k))
+  user_items = [np.where(R_train[u] > 0)[0] for u in range(n_users)]
+  item_users = [np.where(R_train[:, i] > 0)[0] for i in range(n_items)]
+  t0 = time.time()
+
+  for epoch in range(n_epochs):
+    ep_res, ep_cond = [], []
+    for u in range(n_users):
+      rated = user_items[u]
+      if len(rated) == 0: continue
+      V_Iu, r_u = V[rated], R_train[u, rated]
+      A, b = V_Iu.T @ V_Iu + lam_I, V_Iu.T @ r_u
+      x, res = solver_fn(A, b)
+      U[u] = x
+      ep_res.append(res); ep_cond.append(_safe_cond(A))
+
+    for i in range(n_items):
+      rated = item_users[i]
+      if len(rated) == 0: continue
+      U_Ii, r_i = U[rated], R_train[rated, i]
+      A, b = U_Ii.T @ U_Ii + lam_I, U_Ii.T @ r_i
+      x, res = solver_fn(A, b)
+      V[i] = x
+      ep_res.append(res); ep_cond.append(_safe_cond(A))
+
+    log.train_rmse.append(_rmse(R_train, U, V))
+    log.test_rmse.append(_rmse(R_test, U, V))
+    log.train_loss.append(_reg_loss(R_train, U, V, lam))
+    log.residual_norm.append(float(np.mean(ep_res)))
+    log.cond_number.append(float(np.mean(ep_cond)))
+    log.elapsed_time.append(time.time() - t0)
+  return log
+\end{lstlisting}
+
+\subsection{Matrix Inverse Solver}
+\begin{lstlisting}[language=Python, caption={Matrix Inverse Implementation}]
+import numpy as np
+
+def matrix_inverse(A, b):
+    k = len(b)
+    aug = np.zeros((k, 2 * k))
+    for i in range(k):
+        for j in range(k): aug[i, j] = float(A[i, j])
+        aug[i, k + i] = 1.0
+
+    for col in range(k):
+        max_row = col + np.argmax(np.abs(aug[col:, col]))
+        aug[[col, max_row]] = aug[[max_row, col]]
+        pivot = aug[col, col]
+        aug[col] /= pivot
+        for row in range(k):
+            if row == col: continue
+            aug[row] -= aug[row, col] * aug[col]
+
+    A_inv = aug[:, k:]
+    x = A_inv @ b
+    res = float(np.sqrt(np.sum((A @ x - b) ** 2)))
+    return x, res
+\end{lstlisting}
+
+\subsection{Partial Pivoting Solver}
+\begin{lstlisting}[language=Python, caption={Gaussian Elimination Implementation}]
+import numpy as np
+
+def partial_pivoting(A, b):
+    k = len(b)
+    M = np.column_stack((A.astype(float), b.astype(float)))
+    for col in range(k):
+        max_row = col + np.argmax(np.abs(M[col:, col]))
+        M[[col, max_row]] = M[[max_row, col]]
+        for row in range(col + 1, k):
+            factor = M[row, col] / M[col, col]
+            M[row, col:] -= factor * M[col, col:]
+
+    x = np.zeros(k)
+    for i in range(k - 1, -1, -1):
+        x[i] = (M[i, k] - np.dot(M[i, i+1:k], x[i+1:k])) / M[i, i]
+    res = float(np.sqrt(np.sum((A @ x - b) ** 2)))
+    return x, res
+\end{lstlisting}
+
+\subsection{LU Decomposition Solver}
+\begin{lstlisting}[language=Python, caption={LU Decomposition Implementation}]
+import numpy as np
+
+def lu_decomposition(A, b):
+    k = len(b)
+    L, U, P = np.eye(k), A.astype(float).copy(), np.eye(k)
+    for col in range(k):
+        max_row = col + np.argmax(np.abs(U[col:, col]))
+        U[[col, max_row]], P[[col, max_row]] = U[[max_row, col]], P[[max_row, col]]
+        L[[col, max_row], :col] = L[[max_row, col], :col]
+        for row in range(col + 1, k):
+            L[row, col] = U[row, col] / U[col, col]
+            U[row, col:] -= L[row, col] * U[col, col:]
+
+    pb = P @ b
+    y = np.zeros(k)
+    for i in range(k): y[i] = pb[i] - np.dot(L[i, :i], y[:i])
+    x = np.zeros(k)
+    for i in range(k - 1, -1, -1): x[i] = (y[i] - np.dot(U[i, i+1:], x[i+1:])) / U[i, i]
+    res = float(np.sqrt(np.sum((A @ x - b) ** 2)))
+    return x, res
+\end{lstlisting}
+
+\subsection{QR Decomposition Solver}
+\begin{lstlisting}[language=Python, caption={QR Decomposition Implementation}]
+import numpy as np
+
+def qr_decomposition(A, b):
+    k = len(b)
+    R, b_hat = A.astype(float).copy(), b.astype(float).copy()
+    for j in range(k):
+        v = R[j:, j].copy()
+        v[0] += (1.0 if v[0] >= 0.0 else -1.0) * np.sqrt(np.dot(v, v))
+        norm_v = np.sqrt(np.dot(v, v))
+        if norm_v == 0: continue
+        v /= norm_v
+        R[j:, j:] -= 2.0 * np.outer(v, np.dot(v, R[j:, j:]))
+        b_hat[j:] -= 2.0 * v * np.dot(v, b_hat[j:])
+    x = np.zeros(k)
+    for i in range(k - 1, -1, -1): x[i] = (b_hat[i] - np.dot(R[i, i+1:], x[i+1:])) / R[i, i]
+    res = float(np.sqrt(np.sum((A @ x - b) ** 2)))
+    return x, res
+\end{lstlisting}
+
+\subsection{Cholesky Decomposition Solver}
+\begin{lstlisting}[language=Python, caption={Cholesky Decomposition Implementation}]
+import numpy as np
+
+def cholesky_decomposition(A, b):
+    k = len(b)
+    L = np.zeros((k, k))
+    for j in range(k):
+        s = A[j, j] - np.dot(L[j, :j], L[j, :j])
+        L[j, j] = np.sqrt(max(s, 0))
+        for i in range(j + 1, k):
+            L[i, j] = (A[i, j] - np.dot(L[i, :j], L[j, :j])) / L[j, j]
+    y = np.zeros(k)
+    for i in range(k): y[i] = (b[i] - np.dot(L[i, :i], y[:i])) / L[i, i]
+    x = np.zeros(k)
+    for i in range(k - 1, -1, -1): x[i] = (y[i] - np.dot(L[i+1:, i], x[i+1:])) / L[i, i]
+    res = float(np.sqrt(np.sum((A @ x - b) ** 2)))
+    return x, res
+\end{lstlisting}
+
+\restoregeometry
